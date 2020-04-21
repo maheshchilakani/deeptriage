@@ -12,13 +12,13 @@ from torchtext.data import Field, BucketIterator
 
 
 class DeepTriageNN(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim, output_dim,n_layers, bidirectional, dropout, device):     
-        super.__init__()
+    def __init__(self, vocab_size, embedding_dim, hidden_size, output_size, n_layers, bidirectional, dropout, device):     
+        super().__init__()
         self.device = device
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         #encoding the deep representation of the input stack trace
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, num_layers=n_layers, bidirectional=bidirectional=, dropout=dropout batch_first=True)
-        self.fc = nn.Linear(hidden_dim*2, output_dim)
+        self.lstm = nn.LSTM(embedding_dim, hidden_size, num_layers=n_layers, bidirectional=bidirectional, dropout=dropout, batch_first=True)
+        self.fc = nn.Linear(hidden_size*2, output_size)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, stacktrace, stacktrace_lengths):
@@ -29,7 +29,7 @@ class DeepTriageNN(nn.Module):
         packed_output, (hidden_state, cell_state) = self.lstm(packed_embedded)
         hidden = torch.cat((hidden_state[-2,:,:], hidden_state[-1,:,:]), dim = 1)
         dense_outputs=self.fc(hidden)
-        outputs=self.act(dense_outputs)
+        outputs=self.sigmoid(dense_outputs)
         return outputs
 
 
