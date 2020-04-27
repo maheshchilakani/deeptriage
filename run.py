@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader, Dataset
 import  torch.optim as optim
 from torchtext.data import Field, BucketIterator
 
-import numpy as np 
 import math 
 import random 
 import re 
@@ -22,7 +21,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
 import spacy
-import numpy as np
 
 import random
 import math
@@ -30,6 +28,8 @@ import time
 
 from encoder import DeepTriageNN
 from vocabulary import Vocabulary 
+from train import *
+from evaluate import *
 
 def tokenize_en(text):
     """
@@ -40,13 +40,13 @@ def tokenize_en(text):
 ##Hyperparameter
 SEED = 1234
 EMBEDDING_DIM = 100
-BATCH_SIZE = 64
+BATCH_SIZE = 1
 HIDDEN_SIZE = 32
 N_LAYERS = 2
 DROP_OUT = 0.3
+EPOCHS = 10 
 
 random.seed(SEED)
-np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
@@ -81,7 +81,7 @@ BATCH_SIZE = 64
 train_iterator, valid_iterator = data.BucketIterator.splits(
     (train_data, valid_data), 
     batch_size = BATCH_SIZE,
-    sort_key = lambda x: len(x.text),
+    sort_key = lambda x: len(x.stacktrace),
     sort_within_batch=True,
     device = device)
 
@@ -89,3 +89,51 @@ model = DeepTriageNN(len(STACKTRACE.vocab), embedding_dim = EMBEDDING_DIM, hidde
                      n_layers = N_LAYERS, bidirectional = True, dropout = DROP_OUT, device = device)
 
 print(model)
+
+#No. of trianable parameters
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+print(f'The model has {count_parameters(model):,} trainable parameters')
+
+#Initialize the pretrained embedding
+pretrained_embeddings = STACKTRACE.vocab.vectors
+model.embedding.weight.data.copy_(pretrained_embeddings)
+
+
+
+#define optimizer and loss
+optimizer = optim.Adam(model.parameters())
+criterion = nn.CrossEntropyLoss()
+
+#define metric
+def multi_acc(y_pred, y_test):
+    y_pred_softmax = torch.log_softmax(y_pred, dim = 1)
+    _, y_pred_tags = torch.max(y_pred_softmax, dim = 1)    
+    correct_pred = (y_pred_tags == y_test).float()
+    acc = correct_pred.sum() / len(correct_pred)
+    acc = torch.round(acc) * 100
+    return acc
+    
+#push to cuda if available
+model = model.to(device)
+criterion = criterion.to(device)
+
+
+best_valid_loss = float('inf')
+
+for epoch in range(EPOCHS):
+     
+    #train the model
+    train_loss, train_acc = train(model, train_iterator, optimizer, criterion)
+    
+    #evaluate the model
+    valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
+    
+    #save the best model
+    if valid_loss < best_valid_loss:
+        best_valid_loss = valid_loss
+        torch.save(model.state_dict(), 'saved_weights.pt')
+    
+    print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
+    print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
