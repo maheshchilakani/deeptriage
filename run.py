@@ -26,6 +26,11 @@ import random
 import math
 import time
 
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 from encoder import DeepTriageNN
 from vocabulary import Vocabulary 
 from train import *
@@ -75,7 +80,7 @@ ICMTEAM.build_vocab(train_data)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  
 
 #set batch size
-BATCH_SIZE = 64
+BATCH_SIZE = 4
 
 #Load an iterator
 train_iterator, valid_iterator = data.BucketIterator.splits(
@@ -100,6 +105,14 @@ print(f'The model has {count_parameters(model):,} trainable parameters')
 pretrained_embeddings = STACKTRACE.vocab.vectors
 model.embedding.weight.data.copy_(pretrained_embeddings)
 
+accuracy_stats = {
+    'train': [],
+    "val": []
+}
+loss_stats = {
+    'train': [],
+    "val": []
+}
 
 
 #define optimizer and loss
@@ -126,14 +139,25 @@ for epoch in range(EPOCHS):
      
     #train the model
     train_loss, train_acc = train(model, train_iterator, optimizer, criterion)
-    
+    loss_stats['train'].append(train_loss)
+    accuracy_stats['train'].append(train_acc)
     #evaluate the model
     valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
-    
+    loss_stats['val'].append(valid_loss)
+    accuracy_stats['val'].append(valid_acc)
+    print(f'Epoch {(epoch+1)+0:03}: | Train Loss: {train_loss:.5f} | Val Loss: {valid_loss:.5f} | Train Acc: {train_acc:.3f}| Val Acc: {valid_acc:.3f}')
+
     #save the best model
     if valid_loss < best_valid_loss:
         best_valid_loss = valid_loss
         torch.save(model.state_dict(), 'saved_weights.pt')
     
-    print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
-    print(f'\t Val. Loss: {valid_loss:.3f} |  Val. Acc: {valid_acc*100:.2f}%')
+    
+
+# Create dataframes
+train_val_acc_df = pd.DataFrame.from_dict(accuracy_stats).reset_index().melt(id_vars=['index']).rename(columns={"index":"epochs"})
+train_val_loss_df = pd.DataFrame.from_dict(loss_stats).reset_index().melt(id_vars=['index']).rename(columns={"index":"epochs"})
+# Plot the dataframes
+fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20,7))
+sns.lineplot(data=train_val_acc_df, x = "epochs", y="value", hue="variable",  ax=axes[0]).set_title('Train-Val Accuracy/Epoch')
+sns.lineplot(data=train_val_loss_df, x = "epochs", y="value", hue="variable", ax=axes[1]).set_title('Train-Val Loss/Epoch')

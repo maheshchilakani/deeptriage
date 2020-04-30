@@ -1,3 +1,10 @@
+#torch base function package
+import torch 
+#torch nn class definition. We will inherit Module class from this
+#this will help do the leg work of tracking and updating grads. Also 
+#helpps in setting
+import torch.nn as nn 
+
 def train(model, iterator, optimizer, criterion):
     
     #initialize every epoch 
@@ -15,10 +22,7 @@ def train(model, iterator, optimizer, criterion):
         #convert to 1D tensor
         predictions = model(text, text_lengths).squeeze()  
         #compute the loss
-        print(predictions)
-        print("***Batch")
-        print(batch.icmteam)
-        loss = criterion(predictions, batch.icmteam)        
+        loss = criterion(predictions, batch.icmteam.long())        
         #compute the binary accuracy
         acc = multi_acc(predictions, batch.icmteam)   
         #backpropage the loss and compute the gradients
