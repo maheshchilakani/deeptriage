@@ -1,0 +1,23 @@
+.create-or-alter function with (folder = "AutoTriageDeepLearning", docstring = "Function to filter the data which suits for deep learning", skipvalidation = "false")
+GetSmartRoutingErrorsDataForDL(startTime:datetime, endTime:datetime)  
+{
+SmartRoutingErrors
+| where preciseTimeStamp between (startTime..endTime)
+| extend Team = "SmartRoutingErrors"
+| project Team, message
+| distinct Team, message 
+| extend filteredStackTrace = replace(@'[.]',@' ',message) //to remove dots
+| extend filteredStackTrace = replace(@"\(.*?\)",@"",filteredStackTrace) // to remove function arguments within ()
+| extend filteredStackTrace = replace(@"\<.*?\>",@"",filteredStackTrace) // to remove words between <>
+| extend filteredStackTrace = replace(@"[_|<|>|`|(|)|\\|,|[|]|_|:|&|;|!|@|#|$|%|^|-|{|}|'|.]",@" ",filteredStackTrace) // to remove few special characters
+| extend filteredStackTrace = replace(@"]",@" ",filteredStackTrace) // to remove ]
+| extend filteredStackTrace = replace(@"[[:digit:]]+",@"  ",filteredStackTrace) // to remove numbers
+| extend filteredStackTrace = replace(@"[A-Z]",@" \0",filteredStackTrace) // to insert space before every capital letter. Hence to separate words
+| extend filteredStackTrace = replace(@" [A-Z|a-z] ",@" ",filteredStackTrace) // remove single letter words
+| extend filteredStackTrace = replace(@" [A-Z|a-z] ",@" ",filteredStackTrace) // remove single letter words
+| extend filteredStackTrace = replace(@" [A-Z|a-z] ",@" ",filteredStackTrace) // remove single letter words
+| extend filteredStackTrace = replace(@" [A-Z|a-z] ",@" ",filteredStackTrace) // remove single letter words
+| extend filteredStackTrace = replace(@" [A-Z|a-z]$",@" ",filteredStackTrace) // remove single letter words
+| extend filteredStackTrace = replace(@" ([A-Z][A-Z]|[a-z][a-z]|[A-Z][a-z]|[a-z][A-Z]) ",@" ",filteredStackTrace) // remove two letters words
+| project Team, filteredStackTrace, RawStackTrace = message
+}
